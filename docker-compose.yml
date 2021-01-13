@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+
+  server:
+    container_name: taskq
+    image: taskq
+    build: docker/taskq
+    network_mode: "host"
+    tty: True
+    volumes:
+      - .:/app/
