@@ -12,7 +12,7 @@ from subprocess import Popen
 
 
 @click.group()
-@click.version_option(version='1.1.0')
+@click.version_option(version='1.1.3')
 def main():
     """TaskQ - Task queue tool CLI"""
     pass

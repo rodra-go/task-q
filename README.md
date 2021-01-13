@@ -16,7 +16,6 @@ will run with the privileges of user that executed the installation step below.
 
 ``
 sudo taskq install $HOME $(id -u $USER)
-
 ``
 
 ### 1.2. Starting Task Handler
@@ -75,5 +74,7 @@ taskq abort <task id>
 Reseting a task will put it back into the waiting list:
 
 ``
-taskq abort <task id>
+taskq reset <task id>
 ``
+
+For more information, excecute ``taskq --help``.

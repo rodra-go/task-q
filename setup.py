@@ -20,7 +20,7 @@ dependency_links = [x.strip().replace('git+', '') for x in all_reqs \
 setup (
     name = 'task-q',
     description = 'A simple commandline app that implements a task queue',
-    version = '1.1.0',
+    version = '1.1.3',
     packages = find_packages(), # list of all packages
     install_requires = install_requires,
     include_package_data = True,
