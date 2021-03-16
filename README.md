@@ -54,6 +54,7 @@ To show the queue waiting list, run the command below:
 
 ``
 taskq show-queue
+taskq show-queue --<option>
 ``
 
 It is possible to filter the table with the options below:
