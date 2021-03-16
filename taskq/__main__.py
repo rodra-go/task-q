@@ -2,7 +2,6 @@
 import os
 import sys
 import pwd
-import time
 import click
 import signal
 import peewee
@@ -65,7 +64,7 @@ def abort(task_id):
     if ownership is True:
         response = TaskQHelper.abort_task(task_id)
         if response:
-            click.echo('Task with ID={} successfully aborted!'.format(task_id))
+            click.echo('Task with ID={} successfully added to abort queue!'.format(task_id))
         else:
             click.echo('Task with ID={} is not running anymore, impossible to abort!'.format(task_id))
     else:
@@ -73,24 +72,24 @@ def abort(task_id):
         click.echo('Only the task owner or the queue owner can abort the task with ID={}.'.format(task_id))
 
 
-@main.command(short_help="inserts task back into the queue")
-@click.argument('task_id',
-                type=int,
-                required=True)
-def reset(task_id):
-    from taskq.resources import TaskQHelper
-    ownership = TaskQHelper.check_ownership(task_id, os.getuid())
-
-    if ownership is True:
-        response = TaskQHelper.reset_task(task_id)
-        if response:
-            click.echo('Task with ID={} successfully reseted!'.format(task_id))
-        else:
-            click.echo('Task with ID={} is waiting to be processed!'.format(task_id))
-
-    else:
-        click.echo('Impossible to reset task.')
-        click.echo('Only the task owner or the queue owner can reset the task with ID={}.'.format(task_id))
+# @main.command(short_help="inserts task back into the queue")
+# @click.argument('task_id',
+#                 type=int,
+#                 required=True)
+# def reset(task_id):
+#     from taskq.resources import TaskQHelper
+#     ownership = TaskQHelper.check_ownership(task_id, os.getuid())
+#
+#     if ownership is True:
+#         response = TaskQHelper.reset_task(task_id)
+#         if response:
+#             click.echo('Task with ID={} added to abort queue!'.format(task_id))
+#         else:
+#             click.echo('Task with ID={} is waiting to be processed!'.format(task_id))
+#
+#     else:
+#         click.echo('Impossible to reset task.')
+#         click.echo('Only the task owner or the queue owner can reset the task with ID={}.'.format(task_id))
 
 
 @main.command(short_help="shows task queue information")
@@ -120,6 +119,20 @@ def show_queue(mode):
     click.echo(table)
 
 
+@main.command(short_help='shows abort queue information')
+@click.option('--all', 'mode', flag_value='all',
+                help='shows all abort tasks issues')
+@click.option('--done', 'mode', flag_value='done',
+                help='shows only completed abort task issues')
+@click.option('--mine', 'mode', flag_value='mine',
+                help='show only abort task issues belonging to the user')
+def show_abort_queue(mode):
+    from taskq.resources import TaskQHelper
+    table = TaskQHelper.show_abort_queue(mode)
+
+    click.echo(table)
+
+
 @main.command(short_help='calls the task handler')
 def call_task_handler():
     from taskq.utils import Configuration
@@ -131,7 +144,20 @@ def call_task_handler():
         handler = TaskHandler()
         message = handler.handle()
     else:
-        click.echo('Sorry, only the TaskQ Owner can call the Task Handler.')
+        click.echo('Sorry, only the TaskQ Owner can call the TaskQ Bot.')
+
+@main.command(short_help='calls thet task abort handler')
+def call_abort_handler():
+    from taskq.utils import Configuration
+    config = Configuration()
+    ENV = config.loadEnv()
+
+    if str(ENV['owner_id']) == str(os.getuid()):
+        from taskq.resources import AbortHandler
+        handler = AbortHandler()
+        message = handler.handle()
+    else:
+        click.echo('Sorry, only the TaskQ Owner can call the Abort Handler.')
 
 
 def initdb():
@@ -142,12 +168,14 @@ def initdb():
     if os.path.exists(ENV['db_path']):
         os.remove(ENV['db_path'])
 
-    from taskq.models import Queue, Variable
+    from taskq.models import Queue, Variable, AbortQueue
 
     Queue.create_table()
     click.echo("Table 'Queue' created successfully!")
     Variable.create_table()
     click.echo("Table 'Variable' created successfully!")
+    AbortQueue.create_table()
+    click.echo("Table 'AbortQueue' created successfully!")
 
 def fix_db_permissions(db_path):
     with Popen(['sudo chmod g+w {}'.format(db_path)], shell=True, stdin=None, stdout=None, stderr=None, close_fds=True) as proc:
@@ -162,43 +190,30 @@ def start():
     if str(ENV['owner_id']) == str(os.getuid()):
         import taskq
         from taskq.resources import TaskQHelper
-
-        def start_task_handler():
-
-            def show_setting_prgrp():
-                os.setpgrp()
-
-            script = '''#!/bin/sh
-            screen -dmS taskq_task_handler bash -c "python3 {}"
-            '''.format(os.path.join(taskq.__path__[0], 'task-handler.py'))
-
-            script_file = tempfile.NamedTemporaryFile('wt')
-            script_file.write(script)
-            script_file.flush()
-
-            proc = Popen(
-                ['sh', script_file.name],
-                preexec_fn=show_setting_prgrp,
-            )
-            time.sleep(1)
-            os.killpg(proc.pid, signal.SIGUSR1)
-            time.sleep(3)
-
-            TASK_HANDLER_ACTIVE = TaskQHelper.modify_variable('TASK_HANDLER_ACTIVE','True')
-
+        from taskq.utils import start_script
 
         TASK_HANDLER_ACTIVE = TaskQHelper.get_variable('TASK_HANDLER_ACTIVE')
-
-        if TASK_HANDLER_ACTIVE is None:
-            click.echo('Starting Task Handler Bot...')
-            start_task_handler()
+        ABORT_HANDLER_ACTIVE = TaskQHelper.get_variable('ABORT_HANDLER_ACTIVE')
+        TASKQ_STARTED = TaskQHelper.get_variable('TASKQ_STARTED')
+        if TASKQ_STARTED is None:
+            click.echo('Starting Task Handler...')
+            start_script('task-handler.py')
+            click.echo('Starting Abort Handler...')
+            start_script('abort-handler.py')
+            TASKQ_STARTED = TaskQHelper.modify_variable('TASKQ_STARTED','True')
         else:
-            if TASK_HANDLER_ACTIVE.value == 'False':
-                click.echo('Restarting Task Handler Bot...')
-                start_task_handler()
+            if TASKQ_STARTED.value == 'False':
+                click.echo('Restarting Task Handler...')
+                start_script('task-handler.py')
+                click.echo('Restarting Abort Handler...')
+                start_script('abort-handler.py')
+                TASKQ_STARTED = TaskQHelper.modify_variable('TASKQ_STARTED','True')
             else:
                 TASK_HANDLER_PID = TaskQHelper.get_variable('TASK_HANDLER_PID')
-                click.echo('Task Handler already running! PID: {}'.format(TASK_HANDLER_PID.value))
+                ABORT_HANDLER_PID = TaskQHelper.get_variable('ABORT_HANDLER_PID')
+                click.echo('TaskQ queue ready!')
+                click.echo('Task Handler PID: {}'.format(TASK_HANDLER_PID.value))
+                click.echo('Abort Handler PID: {}'.format(ABORT_HANDLER_PID.value))
 
     else:
         click.echo('Sorry, only the TaskQ Owner can start the queue.')
@@ -213,28 +228,33 @@ def stop():
     if str(ENV['owner_id']) == str(os.getuid()):
         from taskq.resources import TaskQHelper
 
-        TASK_HANDLER_ACTIVE = TaskQHelper.get_variable('TASK_HANDLER_ACTIVE')
-        if TASK_HANDLER_ACTIVE is not None:
+        TASKQ_STARTED = TaskQHelper.get_variable('TASKQ_STARTED')
+        if TASKQ_STARTED is not None:
 
-            if TASK_HANDLER_ACTIVE.value == 'True':
+            if TASKQ_STARTED.value == 'True':
                 TASK_HANDLER_PID = TaskQHelper.get_variable('TASK_HANDLER_PID')
+                ABORT_HANDLER_PID = TaskQHelper.get_variable('ABORT_HANDLER_PID')
 
-                if TASK_HANDLER_PID is not None:
+                if TASK_HANDLER_PID is not None and ABORT_HANDLER_PID is not None:
                     cmd = 'kill -9 {}'.format(str(TASK_HANDLER_PID.value))
                     proc = Popen(cmd, shell=True, stdin=None, stdout=None, stderr=None, close_fds=True)
                     proc.wait()
-                    TASK_HANDLER_ACTIVE = TaskQHelper.modify_variable('TASK_HANDLER_ACTIVE','False')
-                    click.echo("Task Handler successfully stoped! PID: {}".format(TASK_HANDLER_PID.value))
-                    TASK_HANDLER_PID = TaskQHelper.del_variable('TASK_HANDLER_PID')
+                    cmd = 'kill -9 {}'.format(str(ABORT_HANDLER_PID.value))
+                    proc = Popen(cmd, shell=True, stdin=None, stdout=None, stderr=None, close_fds=True)
+                    proc.wait()
+                    TASKQ_STARTED = TaskQHelper.modify_variable('TASKQ_STARTED','False')
+                    click.echo("TaskQ Queue successfully stoped!")
+                    TaskQHelper.del_variable('TASK_HANDLER_PID')
+                    TaskQHelper.del_variable('ABORT_HANDLER_PID')
 
                 else:
-                    click.echo('Impossible to find Task Handler PID!')
+                    click.echo('Impossible to find TaskQ Bot PID!')
 
             else:
-                click.echo('Impossible to stop, Task Handler not active.')
+                click.echo('Impossible to stop, TaskQ Queue not active.')
 
         else:
-            click.echo('Impossible to stop, Task Handler not active.')
+            click.echo('Impossible to stop, TaskQ Queue has not been activate yet.')
 
     else:
         click.echo('Sorry, only the TaskQ Owner can stop the queue.')

@@ -17,6 +17,8 @@ ENV GROUP_ID_2=1001 \
     USER_ID_2=1001 \
     USER_2=user01
 
+ENV PATH="/home/$USER/.local/bin:${PATH}"
+
 RUN addgroup --gid $GROUP_ID $USER
 RUN adduser --uid $USER_ID --ingroup $USER --shell /bin/bash --disabled-password --gecos "" $USER
 RUN usermod -aG 100 $USER

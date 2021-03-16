@@ -44,6 +44,23 @@ class Queue(BaseModel):
     canceled_at = peewee.DateTimeField(null=True)
 
 
+class AbortQueue(BaseModel):
+
+    """
+    Classe que representa a tabela Author
+    """
+    # A tabela possui apenas o campo 'name', que receberá o nome do autor sera unico
+    user_id = peewee.IntegerField(null=True)
+    user_name = peewee.TextField(null=True)
+    pid = peewee.IntegerField(null=True)
+    task_id = peewee.IntegerField(null=True)
+    is_waiting = peewee.BooleanField(default=True)
+    is_complete = peewee.BooleanField(default=False)
+    created_at = peewee.DateTimeField(default=datetime.datetime.now)
+    started_at = peewee.DateTimeField(null=True)
+    completed_at = peewee.DateTimeField(null=True)
+
+
 class Variable(BaseModel):
 
     """
@@ -66,5 +83,7 @@ if __name__ == '__main__':
         click.echo("Table 'Queue' created successfully!")
         Variable.create_table()
         click.echo("Table 'Variable' created successfully!")
+        AbortQueue.create_table()
+        click.echo("Table 'AbortQueue' created successfully!")
     except peewee.OperationalError:
         click.echo("Table 'Queue' already exists!")

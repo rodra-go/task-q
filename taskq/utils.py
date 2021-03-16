@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 import os
 import pwd
+import time
+import signal
 import taskq
 import pickle
+import tempfile
 from pathlib import Path
 from subprocess import Popen
 
@@ -66,3 +69,30 @@ class Configuration:
             pickle.dump(self.env,
                         file,
                         pickle.HIGHEST_PROTOCOL)
+
+
+def start_script(script_file):
+
+    def show_setting_prgrp():
+        os.setpgrp()
+
+    # try:
+    script = '''#!/bin/sh
+    screen -dmS taskq_task_handler bash -c "python3 {}"
+    '''.format(os.path.join(taskq.__path__[0], script_file))
+
+    script_file = tempfile.NamedTemporaryFile('wt')
+    script_file.write(script)
+    script_file.flush()
+
+    proc = Popen(
+        ['sh', script_file.name],
+        preexec_fn=show_setting_prgrp,
+    )
+    time.sleep(1)
+    os.killpg(proc.pid, signal.SIGUSR1)
+    time.sleep(3)
+
+    return True
+    # except:
+    #     return False

@@ -6,19 +6,30 @@ task to the same queue, which will be handled by the Task Handler Bot.
 
 ## 1. Setup
 
-### 1.1. Installing TaskQ
+### 1.1. Installing Screen
+
+The Linux program Screen is a TaskQ's dependecy. In order to install it on Ubuntu,
+run the commands:
+
+```
+sudo apt-get update
+sudo apt-get install screen
+```
+
+### 1.2. Installing TaskQ
 
 TaskQ needs to be installed in order to set its dependecies correctly.
 In order to do that, it needs a folder to be the TaskQ home, where the app
 will save its local files, and also an UID to define
-the owner of TaskQ's queue. It is important to note that the Task Handler Bot
+the owner of TaskQ's queue. It is important to note that the TaskQ Bot
 will run with the privileges of user that executed the installation step below.
 
-``
+```
+sudo pip install task-q
 sudo taskq install $HOME $(id -u $USER)
-``
+```
 
-### 1.2. Starting Task Handler
+### 1.3. Starting Task Handler
 
 The Task Handler is the bot that will execute the tasks in the TaskQ queue.
 It is necessary to start it manually. It is important to note that only the
@@ -67,14 +78,6 @@ Aborting a task will remove it out of the waiting list:
 
 ``
 taskq abort <task id>
-``
-
-### 2.4. Reset a task
-
-Reseting a task will put it back into the waiting list:
-
-``
-taskq reset <task id>
 ``
 
 For more information, excecute ``taskq --help``.

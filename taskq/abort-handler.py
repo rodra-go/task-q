@@ -17,13 +17,13 @@ def signal_usr1(signum, frame):
 
 def job():
     # click.echo('Calling Task Handler')
-    proc = Popen(['taskq', 'call-task-handler'], stdin=None, stdout=None, stderr=None, close_fds=True)
+    proc = Popen(['taskq', 'call-abort-handler'], stdin=None, stdout=None, stderr=None, close_fds=True)
     proc.wait()
 
     return proc.pid
 
 def bot():
-    schedule.every(10).seconds.do(job)
+    schedule.every(1).seconds.do(job)
 
     while 1:
         # click.echo('Running...')
@@ -33,8 +33,8 @@ def bot():
         # click.echo('Done!\n')
 
 received = False
-TaskQHelper.modify_variable('TASK_HANDLER_PID',str(os.getpid()))
-TaskQHelper.modify_variable('TASK_HANDLER_ACTIVE','True')
+TaskQHelper.modify_variable('ABORT_HANDLER_PID',str(os.getpid()))
+TaskQHelper.modify_variable('ABORT_HANDLER_ACTIVE','True')
 signal.signal(signal.SIGUSR1, signal_usr1)
 
 bot()
